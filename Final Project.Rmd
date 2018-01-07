@@ -1,0 +1,101 @@
+---
+title: "Final Project"
+author: "AnnElizabeth and Justin Landay"
+date: "6/22/2017"
+output: html_document
+---
+Through our project, we choose to examine whether there is a relationship between environmental factors and the Human Development Index score (HDI). HDI is a measure of a country's various aspects of human development and is based on the three components of: "a long healthy life, being knowledgeable and have a decent standard of living" (1). It is important to note that HDI is only one component to understanding the complexities of human development and does not account for social, economic or gender inequality, security and poverty. 
+
+There is an extensive body of research dedicated the relationship between human development and environmental factors, and a subset of academic literature which strongly argues for HDI calculations to be adjusted for countries' environmental sustainability. A UN Report acknowledges that environmental decline could slow human development and that an major environmental disaster has the potential to reverse progress particularly in some of the world's least developed countries (2). 
+
+To examine our question, we choose to select data from the Global Footprint Network and choose to look at HDI as the dependent variable. The independent variables are Region, Per Capita GDP, Cropland Footprint, Grazing Footprint, Forest Footprint, Carbon Footprint, Fish Footprint and Built-up Land. It is important to note that Cropland Footprint, Grazing Footprint, Forest Footprint, Carbon Footprint, Fish Footprint and Built-up Land total the ecological footprint of consumption. We did not examine the ecological footprint of production.
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+getwd()
+```
+Our first step is importing the data into a dataframe. Once imported, we ran a summary and saw there were 17 missing values. We removed the rows for which there were missing values to have a complete dataset. We also converted the factor variables to num variables.
+```{r cars}
+library(psych)
+library(dplyr)
+library(corrplot)
+library(leaps)
+data<-read.csv("countries.csv")
+summary(data)
+data<-data[complete.cases(data),]
+str(data)
+data<- data.frame(lapply(data,as.numeric))
+str(data)
+summary(data)
+attach(data)
+```
+We looked at the structure, top, and bottom of the data to check that everything looked alright.
+```{r}
+str(data)
+head(data)
+tail(data)
+```
+We generated histograms and ran tests for normality for some of the variables we thought would be most relevent. While not all of the independent varibales appeared to be normally distributed, the HDI, our dependent variable was. We did not expect most of the variables to be normally distributed since differet countries have massive variability when it comes to their consumption of natural resources.
+```{r}
+hist(HDI)
+shapiro.test(HDI)
+hist(Per.Capita.GDP,20)
+shapiro.test(Per.Capita.GDP)
+hist(Cropland.Footprint)
+shapiro.test(Cropland.Footprint)
+hist(Grazing.Footprint)
+shapiro.test(Grazing.Footprint)
+hist(Forest.Product.Footprint)
+shapiro.test(Forest.Product.Footprint)
+hist(Carbon.Footprint)
+shapiro.test(Carbon.Footprint)
+hist(Fish.Footprint)
+shapiro.test(Fish.Footprint)
+hist(Built.up.land)
+shapiro.test(Built.up.land)
+
+```
+We wanted to build a correlation matrix to see what variables are correlated with the HDI and each other. From the matrix we can see that HDI is strongly correlated with Cropland Footprint, Carbon Footprint and Per capital GDP while being moderately correlated with the Region. There is also a strong correlation between Carbon Footprint and Per Capita GDP.
+```{r}
+
+cor.data<-cor(data.frame(HDI, Region, Population..millions.,Per.Capita.GDP,Cropland.Footprint,Grazing.Footprint, Forest.Product.Footprint, Carbon.Footprint,Fish.Footprint,Built.up.land))
+corrplot(cor.data,method="number",type="lower",tl.col="black")
+```
+To start, we ran backwards and forward regression on all of the available variables. Both of these methods factored all the variables however we ran one last time on only the footprint varaibles, the region and Per capita GDP to see which footprint variables have the strongest impact on HDI. From this we saw that Region, Cropland Footprint, Carbon Footprint and Per capita GDP can explain over 67% of the varience in the data. Additionally, a one unit increase of the cropland footprint would increase HDI by 9.97e-2 units while if carbon footprint increased by one unit HDI would increase by 2.19e-2 so we infer that cropland footprint is about five times more impactful on determining how HDI changes given equal unit increases. 
+```{r}
+train <- data[1:128, ]
+test <- data[128:163, ]
+attach(train)
+
+reg.forw <- regsubsets(HDI~., data = train, nvmax = 20)
+plot(reg.forw, scale = "adjr2", main = "Adjusted R^2")
+summary(reg.forw)
+
+#We can also go backward and see if our results are any different#
+reg.back <- regsubsets(HDI~., data = train, method = "backward", nvmax = 60)
+plot(reg.back, scale = "adjr2", main = "Adjusted R^2")
+
+
+reg.best<-regsubsets(HDI~Region+Cropland.Footprint+Grazing.Footprint+Forest.Product.Footprint+Carbon.Footprint+Fish.Footprint+ Built.up.land, data = train, method = "backward" ,nvmax = 60)
+plot(reg.best, scale = "adjr2", main = "Adjusted R^2")
+
+
+model.final <- lm(HDI~+Cropland.Footprint+Carbon.Footprint+Region+GDP.per.Capita ,data =train)
+summary(model.final)
+hist(model.final$residuals)
+shapiro.test(model.final$residuals)
+```
+Let's test some of our predictions. Our chosen criteron for a sucsessful prediction is if the percent change between the prediction and the real value is less than 15%.
+```{r}
+pred.model <- predict.lm(model.final,test,type='response')
+pred.model2 <- ifelse(abs((pred.model-test$HDI)/test$HDI) > 0.15,0,1)
+head(pred.model2)
+
+
+Sucess.rate<- sum(pred.model2)/length(pred.model2)
+Sucess.rate
+```
+Some additional information for future research is to understand the intricacies of the relationship between GDP per capita and Carbon Footprint, especially in relation to countries that are shifting toward green technology. Additionally more information is need about the calculation of the footprints and their associated error terms. One limitations is intrisic to the model itself; HDI is only one angle to evaluation the development of a country. Likewise, the model does not account development disparity within a country in terms of location, particular in regards to rural vs. urban. 
+
+Sources:
+1. "Human Development Reports." Human Development Index (HDI) | Human Development Reports. N.p., n.d. Web. 22 June 2017.
+2. Hughes, Barry B., Mohammad T. Irfan, Jonathan D. Moyer, Dale S. Rothman, and Jose R. Solorzano. Forecasting the Impacts of Environmental Constraints on Human Development. Rep. N.p.: United Nations Development Program, 2011. Print.
